@@ -196,7 +196,8 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
 
     const criticalViolations = policies.reduce((a, x) => a + numberValue(x.critical_count), 0);
     const warningViolations = policies.reduce((a, x) => a + numberValue(x.warning_count), 0);
-    const latestAudit = policies.map((x) => x.last_check_at ?? x.updated_at).filter(Boolean).sort().at(-1);
+    const auditDates = policies.map((x) => x.last_check_at ?? x.updated_at).filter(Boolean).sort();
+    const latestAudit = auditDates.length ? auditDates[auditDates.length - 1] : null;
     const today = new Date().toISOString().slice(0, 10);
 
     setData({
