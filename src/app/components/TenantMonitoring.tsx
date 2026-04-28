@@ -30,9 +30,9 @@ export function TenantMonitoring({ policies, workflows, endpoints, summary }: Te
   const [perPage, setPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const visiblePolicies = useMemo(() => policies.filter((row) => `${row.tenantId} ${row.policyName} ${row.category}`.toLowerCase().includes(searchQuery.toLowerCase())), [policies, searchQuery]);
-  const visibleWorkflows = useMemo(() => workflows.filter((row) => `${row.tenantId} ${row.workflowName} ${row.version}`.toLowerCase().includes(searchQuery.toLowerCase())), [workflows, searchQuery]);
-  const visibleEndpoints = useMemo(() => endpoints.filter((row) => `${row.tenantId} ${row.endpoint} ${row.method}`.toLowerCase().includes(searchQuery.toLowerCase())), [endpoints, searchQuery]);
+  const visiblePolicies = useMemo(() => policies.filter((row) => `${row.policyName} ${row.category}`.toLowerCase().includes(searchQuery.toLowerCase())), [policies, searchQuery]);
+  const visibleWorkflows = useMemo(() => workflows.filter((row) => `${row.workflowName} ${row.version}`.toLowerCase().includes(searchQuery.toLowerCase())), [workflows, searchQuery]);
+  const visibleEndpoints = useMemo(() => endpoints.filter((row) => `${row.endpoint} ${row.method}`.toLowerCase().includes(searchQuery.toLowerCase())), [endpoints, searchQuery]);
 
   const activeRows = activeTab === 'policies' ? visiblePolicies : activeTab === 'workflows' ? visibleWorkflows : visibleEndpoints;
   const totalEntries = activeRows.length;
@@ -54,7 +54,7 @@ export function TenantMonitoring({ policies, workflows, endpoints, summary }: Te
             <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] sm:text-xs font-medium"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>{healthyCount} Healthy</span>
           </div>
         </div>
-        <div className="relative w-full sm:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" /><input type="text" placeholder="Search tenants..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="w-full pl-9 sm:pl-10 pr-4 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent" /></div>
+        <div className="relative w-full sm:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" /><input type="text" placeholder="Search monitoring..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="w-full pl-9 sm:pl-10 pr-4 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:border-transparent" /></div>
       </div>
 
       <div className="flex gap-0.5 sm:gap-1 mb-4 sm:mb-6 border-b border-gray-200 overflow-x-auto">
