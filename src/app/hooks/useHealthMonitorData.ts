@@ -213,10 +213,10 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     const recentWorkflowMetrics = (recentWorkflowsResult.data ?? []) as MetricRow[];
     const apiMetrics = (metricsResult.data ?? []) as MetricRow[];
     const recentApiMetrics = (recentMetricsResult.data ?? []) as MetricRow[];
-    const policies = latestBy(policyMetrics, (x) => x.policy_id ?? x.policy_name, 'evaluated_at');
+    const policies = latestBy(policyMetrics, (x) => stringValue(x.policy_id ?? x.policy_name, 'policy'), 'evaluated_at');
     const workflowGroups = new Map<string, MetricRow[]>();
     workflowMetrics.forEach((row) => {
-      const key = row.workflow_id ?? row.workflow_name;
+      const key = stringValue(row.workflow_id ?? row.workflow_name, 'workflow');
       workflowGroups.set(key, [...(workflowGroups.get(key) ?? []), row]);
     });
     const workflows: MetricRow[] = Array.from(workflowGroups.values()).map((rows) => {
@@ -263,17 +263,17 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
         compliant: policies.filter((x) => x.compliant).length,
         nonCompliant: policies.filter((x) => !x.compliant).length,
         exempted: policies.filter((x) => String(x.decision ?? '').toUpperCase() === 'EXEMPTED').length,
-        lastAudit: formatRelative(latestAudit),
+        lastAudit: formatRelative(stringValue(latestAudit, '')),
         driftEventsToday: unresolvedEvents.filter((x) => x.event_type === 'POLICY_DRIFT' && String(x.detected_at ?? '').startsWith(today)).length,
       },
       policies: recentPolicyMetrics.map(mapPolicy),
       workflows: recentWorkflowMetrics.map(mapWorkflow),
       apiEndpoints: recentApiMetrics.map(mapApiEndpoint),
       rootCauseEvents: unresolvedEvents.map((event) => ({
-        severity: event.severity ?? 'info',
-        title: event.title ?? 'Health event detected',
-        description: event.description ?? 'Review this event for more details.',
-        traceId: event.trace_id,
+        severity: stringValue(event.severity, 'info'),
+        title: stringValue(event.title, 'Health event detected'),
+        description: stringValue(event.description, 'Review this event for more details.'),
+        traceId: event.trace_id ? stringValue(event.trace_id, '') : undefined,
         actionLabel: 'Read more',
       } satisfies RootCauseEvent)),
       apiTrend: buildApiTrend([...(metricsResult.data ?? [])].reverse() as MetricRow[]),
