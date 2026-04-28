@@ -10,7 +10,7 @@ import { useHealthMonitorData } from './hooks/useHealthMonitorData';
 
 export default function App() {
   const auth = useIframeAuth();
-  const { data, loading, error, lastUpdatedAt } = useHealthMonitorData(auth.tenantId, auth.isReady && !auth.error);
+  const { data, loading, error, lastUpdatedAt, refetch } = useHealthMonitorData(auth.tenantId, auth.isReady && !auth.error);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -83,7 +83,17 @@ export default function App() {
             <ViolationHeatmap data={data.violationHeatmap} />
           </div>
 
-          <TenantMonitoring policies={data.policies} workflows={data.workflows} endpoints={data.apiEndpoints} summary={data.summary} />
+          <TenantMonitoring
+            policies={data.policies}
+            workflows={data.workflows}
+            endpoints={data.apiEndpoints}
+            tenantId={auth.tenantId}
+            userId={auth.userId}
+            email={auth.email}
+            accessToken={auth.accessToken}
+            refreshToken={auth.refreshToken}
+            onRefresh={refetch}
+          />
         </div>
       </div>
     </div>

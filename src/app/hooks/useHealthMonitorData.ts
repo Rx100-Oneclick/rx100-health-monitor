@@ -11,8 +11,9 @@ import type {
   WorkflowRow,
 } from '../types';
 
-type EventRow = Record<string, any>;
-type MetricRow = Record<string, any>;
+type JsonObject = Record<string, unknown>;
+type EventRow = Record<string, unknown> & { metadata?: JsonObject | null };
+type MetricRow = Record<string, unknown> & { metadata?: JsonObject | null };
 
 const emptyDashboard: DashboardData = {
   summary: {
@@ -54,6 +55,11 @@ const numberValue = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const stringValue = (value: unknown, fallback = '—') => {
+  if (value === null || value === undefined || value === '') return fallback;
+  return String(value);
+};
+
 const formatRelative = (value?: string | null) => {
   if (!value) return '—';
   const diff = Math.max(0, Date.now() - new Date(value).getTime());
@@ -87,51 +93,60 @@ const bucketTime = (value: string, minutes = 5) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
-const latestBy = <T extends Record<string, any>>(rows: T[], keyGetter: (row: T) => string, dateField: string) => {
+const latestBy = <T extends Record<string, unknown>>(rows: T[], keyGetter: (row: T) => string, dateField: string) => {
   const latest = new Map<string, T>();
   rows.forEach((row) => {
     const key = keyGetter(row);
     const current = latest.get(key);
-    if (!current || new Date(row[dateField]).getTime() > new Date(current[dateField]).getTime()) latest.set(key, row);
+    if (!current || new Date(String(row[dateField])).getTime() > new Date(String(current[dateField])).getTime()) latest.set(key, row);
   });
   return Array.from(latest.values());
 };
 
 const mapPolicy = (row: MetricRow): PolicyRow => ({
   status: row.compliant ? 'healthy' : numberValue(row.violation_count) > 1 ? 'critical' : 'warning',
-  tenantId: row.tenant_id,
-  policyName: row.policy_name ?? row.policy_id ?? 'Unnamed policy',
-  category: row.metadata?.category ?? '—',
+  tenantId: stringValue(row.tenant_id, ''),
+  policyName: stringValue(row.policy_name ?? row.policy_id, 'Unnamed policy'),
+  category: stringValue(row.metadata?.category),
   compliance: row.compliant ? 100 : Math.max(0, 100 - numberValue(row.violation_count, 1) * 10),
-  lastCheck: formatRelative(row.evaluated_at),
+  lastCheck: formatRelative(stringValue(row.evaluated_at, '')),
 });
 
 const mapWorkflow = (row: MetricRow): WorkflowRow => ({
-  status: normalizeStatus(row.status),
-  tenantId: row.tenant_id,
-  workflowName: row.workflow_name ?? row.workflow_id ?? 'Unnamed workflow',
-  version: row.workflow_version ?? '—',
-  runs24h: numberValue(row.total_runs_24h),
-  successRate: numberValue(row.success_rate),
-  avgDuration: formatDuration(row.avg_duration_ms),
-  lastCheck: formatRelative(row.captured_at),
+  status: normalizeStatus(stringValue(row.status, '')),
+  tenantId: stringValue(row.tenant_id, ''),
+  workflowName: stringValue(row.workflow_name ?? row.workflow_id, 'Unnamed workflow'),
+  version: stringValue(row.workflow_version),
+  runs24h: numberValue(row.total_runs_24h, 1),
+  successRate: row.success_rate == null ? (['SUCCESS', 'COMPLETED', 'HEALTHY'].includes(String(row.status ?? '').toUpperCase()) ? 100 : 0) : numberValue(row.success_rate),
+  avgDuration: formatDuration(row.avg_duration_ms ?? row.duration_ms),
+  lastCheck: formatRelative(stringValue(row.captured_at, '')),
 });
 
+const deriveApiStatus = (row: MetricRow): HealthStatus => {
+  const statusCode = numberValue(row.status_code);
+  const errorRate = numberValue(row.error_rate);
+  if (String(row.status ?? '').length) return normalizeStatus(stringValue(row.status, ''));
+  if (statusCode >= 500 || errorRate >= 5 || row.is_success === false) return 'critical';
+  if (statusCode >= 400 || errorRate >= 1) return 'warning';
+  return 'healthy';
+};
+
 const mapApiEndpoint = (row: MetricRow): ApiEndpointRow => ({
-  status: normalizeStatus(row.status),
-  tenantId: row.tenant_id,
-  endpoint: row.endpoint ?? '—',
-  method: row.method ?? 'GET',
-  latencyP95: numberValue(row.latency_p95_ms),
+  status: deriveApiStatus(row),
+  tenantId: stringValue(row.tenant_id, ''),
+  endpoint: stringValue(row.endpoint),
+  method: stringValue(row.method, 'GET'),
+  latencyP95: numberValue(row.latency_p95_ms ?? row.latency_ms),
   errorRate: numberValue(row.error_rate),
   rps: numberValue(row.rps),
-  lastCheck: formatRelative(row.captured_at),
+  lastCheck: formatRelative(stringValue(row.captured_at, '')),
 });
 
 const buildApiTrend = (rows: MetricRow[]): ApiTrendPoint[] => {
   const buckets = new Map<string, number[]>();
   rows.forEach((row) => {
-    const key = bucketTime(row.captured_at, 5);
+    const key = bucketTime(stringValue(row.captured_at, ''), 5);
     const bucket = buckets.get(key) ?? [];
     bucket.push(numberValue(row.latency_ms));
     buckets.set(key, bucket);
@@ -149,7 +164,7 @@ const buildApiTrend = (rows: MetricRow[]): ApiTrendPoint[] => {
 const buildViolationHeatmap = (rows: EventRow[]): ViolationHeatmapPoint[] => {
   const buckets = new Map<string, ViolationHeatmapPoint>();
   rows.forEach((row) => {
-    const time = bucketTime(row.detected_at, 60);
+    const time = bucketTime(stringValue(row.detected_at, ''), 60);
     const point = buckets.get(time) ?? { id: time, time, critical: 0, high: 0, medium: 0, low: 0 };
     const severity = String(row.severity ?? 'low').toLowerCase();
     if (severity === 'critical') point.critical += 1;
@@ -174,15 +189,18 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
 
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const [policiesResult, workflowsResult, metricsResult, eventsResult, violationResult] = await Promise.all([
+    const [policiesResult, recentPoliciesResult, workflowsResult, recentWorkflowsResult, metricsResult, recentMetricsResult, eventsResult, violationResult] = await Promise.all([
       supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }),
+      supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }).limit(5),
       supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).gte('captured_at', oneDayAgo).order('captured_at', { ascending: false }),
+      supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
       supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(1000),
+      supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
       supabase.from('health_monitor_events').select('*').eq('tenant_id', tenantId).eq('is_resolved', false).order('detected_at', { ascending: false }).limit(5),
       supabase.from('health_monitor_events').select('detected_at, severity').eq('tenant_id', tenantId).eq('entity_type', 'POLICY').eq('event_type', 'POLICY_VIOLATION').gte('detected_at', oneDayAgo),
     ]);
 
-    const firstError = policiesResult.error ?? workflowsResult.error ?? metricsResult.error ?? eventsResult.error ?? violationResult.error;
+    const firstError = policiesResult.error ?? recentPoliciesResult.error ?? workflowsResult.error ?? recentWorkflowsResult.error ?? metricsResult.error ?? recentMetricsResult.error ?? eventsResult.error ?? violationResult.error;
     if (firstError) {
       setError(firstError.message);
       setLoading(false);
@@ -190,12 +208,15 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     }
 
     const policyMetrics = (policiesResult.data ?? []) as MetricRow[];
+    const recentPolicyMetrics = (recentPoliciesResult.data ?? []) as MetricRow[];
     const workflowMetrics = (workflowsResult.data ?? []) as MetricRow[];
+    const recentWorkflowMetrics = (recentWorkflowsResult.data ?? []) as MetricRow[];
     const apiMetrics = (metricsResult.data ?? []) as MetricRow[];
-    const policies = latestBy(policyMetrics, (x) => x.policy_id ?? x.policy_name, 'evaluated_at');
+    const recentApiMetrics = (recentMetricsResult.data ?? []) as MetricRow[];
+    const policies = latestBy(policyMetrics, (x) => stringValue(x.policy_id ?? x.policy_name, 'policy'), 'evaluated_at');
     const workflowGroups = new Map<string, MetricRow[]>();
     workflowMetrics.forEach((row) => {
-      const key = row.workflow_id ?? row.workflow_name;
+      const key = stringValue(row.workflow_id ?? row.workflow_name, 'workflow');
       workflowGroups.set(key, [...(workflowGroups.get(key) ?? []), row]);
     });
     const workflows: MetricRow[] = Array.from(workflowGroups.values()).map((rows) => {
@@ -242,17 +263,17 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
         compliant: policies.filter((x) => x.compliant).length,
         nonCompliant: policies.filter((x) => !x.compliant).length,
         exempted: policies.filter((x) => String(x.decision ?? '').toUpperCase() === 'EXEMPTED').length,
-        lastAudit: formatRelative(latestAudit),
+        lastAudit: formatRelative(stringValue(latestAudit, '')),
         driftEventsToday: unresolvedEvents.filter((x) => x.event_type === 'POLICY_DRIFT' && String(x.detected_at ?? '').startsWith(today)).length,
       },
-      policies: policies.map(mapPolicy),
-      workflows: workflows.map(mapWorkflow),
-      apiEndpoints: apis.map(mapApiEndpoint),
+      policies: recentPolicyMetrics.map(mapPolicy),
+      workflows: recentWorkflowMetrics.map(mapWorkflow),
+      apiEndpoints: recentApiMetrics.map(mapApiEndpoint),
       rootCauseEvents: unresolvedEvents.map((event) => ({
-        severity: event.severity ?? 'info',
-        title: event.title ?? 'Health event detected',
-        description: event.description ?? 'Review this event for more details.',
-        traceId: event.trace_id,
+        severity: stringValue(event.severity, 'info'),
+        title: stringValue(event.title, 'Health event detected'),
+        description: stringValue(event.description, 'Review this event for more details.'),
+        traceId: event.trace_id ? stringValue(event.trace_id, '') : undefined,
         actionLabel: 'Read more',
       } satisfies RootCauseEvent)),
       apiTrend: buildApiTrend([...(metricsResult.data ?? [])].reverse() as MetricRow[]),
