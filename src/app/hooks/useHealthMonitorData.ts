@@ -113,7 +113,7 @@ const mapWorkflow = (row: MetricRow): WorkflowRow => ({
   version: row.workflow_version ?? '—',
   runs24h: numberValue(row.total_runs_24h, 1),
   successRate: row.success_rate == null ? (['SUCCESS', 'COMPLETED', 'HEALTHY'].includes(String(row.status ?? '').toUpperCase()) ? 100 : 0) : numberValue(row.success_rate),
-  avgDuration: formatDuration(row.avg_duration_ms),
+  avgDuration: formatDuration(row.avg_duration_ms ?? row.duration_ms),
   lastCheck: formatRelative(row.captured_at),
 });
 
