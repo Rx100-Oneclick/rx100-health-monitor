@@ -88,42 +88,45 @@ const bucketTime = (value: string, minutes = 5) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
-const eventActionLabel = (type?: string) => {
-  if (type === 'API_LATENCY_SPIKE') return 'View Trace';
-  if (type === 'TENANT_QUOTA_WARNING') return 'Adjust Quota';
-  if (type === 'POLICY_DRIFT') return 'Review Change';
-  return 'View Details';
+const latestBy = <T extends Record<string, any>>(rows: T[], keyGetter: (row: T) => string, dateField: string) => {
+  const latest = new Map<string, T>();
+  rows.forEach((row) => {
+    const key = keyGetter(row);
+    const current = latest.get(key);
+    if (!current || new Date(row[dateField]).getTime() > new Date(current[dateField]).getTime()) latest.set(key, row);
+  });
+  return Array.from(latest.values());
 };
 
-const mapPolicy = (row: SnapshotRow): PolicyRow => ({
-  status: normalizeStatus(row.status),
+const mapPolicy = (row: MetricRow): PolicyRow => ({
+  status: row.compliant ? 'healthy' : numberValue(row.violation_count) > 1 ? 'critical' : 'warning',
   tenantId: row.tenant_id,
-  policyName: row.entity_name ?? row.entity_id ?? 'Unnamed policy',
+  policyName: row.policy_name ?? row.policy_id ?? 'Unnamed policy',
   category: row.metadata?.category ?? '—',
-  compliance: numberValue(row.compliance_score),
-  lastCheck: formatRelative(row.last_check_at ?? row.updated_at),
+  compliance: row.compliant ? 100 : Math.max(0, 100 - numberValue(row.violation_count, 1) * 10),
+  lastCheck: formatRelative(row.evaluated_at),
 });
 
-const mapWorkflow = (row: SnapshotRow): WorkflowRow => ({
+const mapWorkflow = (row: MetricRow): WorkflowRow => ({
   status: normalizeStatus(row.status),
   tenantId: row.tenant_id,
-  workflowName: row.entity_name ?? row.entity_id ?? 'Unnamed workflow',
-  version: row.metadata?.version ?? '—',
+  workflowName: row.workflow_name ?? row.workflow_id ?? 'Unnamed workflow',
+  version: row.workflow_version ?? '—',
   runs24h: numberValue(row.total_runs_24h),
   successRate: numberValue(row.success_rate),
-  avgDuration: formatDuration(row.metadata?.avg_duration_ms),
-  lastCheck: formatRelative(row.last_check_at ?? row.updated_at),
+  avgDuration: formatDuration(row.avg_duration_ms),
+  lastCheck: formatRelative(row.captured_at),
 });
 
-const mapApiEndpoint = (row: SnapshotRow): ApiEndpointRow => ({
+const mapApiEndpoint = (row: MetricRow): ApiEndpointRow => ({
   status: normalizeStatus(row.status),
   tenantId: row.tenant_id,
-  endpoint: row.entity_id ?? row.entity_name ?? '—',
-  method: row.metadata?.method ?? 'GET',
+  endpoint: row.endpoint ?? '—',
+  method: row.method ?? 'GET',
   latencyP95: numberValue(row.latency_p95_ms),
   errorRate: numberValue(row.error_rate),
   rps: numberValue(row.rps),
-  lastCheck: formatRelative(row.last_check_at ?? row.updated_at),
+  lastCheck: formatRelative(row.captured_at),
 });
 
 const buildApiTrend = (rows: MetricRow[]): ApiTrendPoint[] => {
