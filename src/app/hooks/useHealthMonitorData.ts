@@ -172,13 +172,12 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     setLoading(true);
     setError(null);
 
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const [policiesResult, workflowsResult, metricsResult, eventsResult, violationResult] = await Promise.all([
       supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }),
       supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).gte('captured_at', oneDayAgo).order('captured_at', { ascending: false }),
-      supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).gte('captured_at', oneHourAgo).order('captured_at', { ascending: true }),
+      supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(1000),
       supabase.from('health_monitor_events').select('*').eq('tenant_id', tenantId).eq('is_resolved', false).order('detected_at', { ascending: false }).limit(5),
       supabase.from('health_monitor_events').select('detected_at, severity').eq('tenant_id', tenantId).eq('entity_type', 'POLICY').eq('event_type', 'POLICY_VIOLATION').gte('detected_at', oneDayAgo),
     ]);
@@ -211,9 +210,11 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     });
     const apis: MetricRow[] = Array.from(apiGroups.values()).map((rows) => {
       const latest = latestBy(rows, () => 'api', 'captured_at')[0] ?? rows[0];
-      const failures = rows.filter((x) => x.is_success === false).length;
-      const errorRate = rows.length ? (failures / rows.length) * 100 : numberValue(latest.error_rate);
-      return { ...latest, status: errorRate >= 5 ? 'CRITICAL' : errorRate >= 1 ? 'WARNING' : 'HEALTHY', latency_p95_ms: percentile(rows.map((x) => numberValue(x.latency_ms)), 95), error_rate: errorRate, rps: numberValue(latest.rps) };
+      const errorRates = rows.map((x) => numberValue(x.error_rate)).filter((value) => Number.isFinite(value));
+      const errorRate = errorRates.length ? errorRates.reduce((sum, value) => sum + value, 0) / errorRates.length : 0;
+      const statusCode = numberValue(latest.status_code);
+      const status = statusCode >= 500 || errorRate >= 5 || latest.is_success === false ? 'CRITICAL' : errorRate >= 1 || statusCode >= 400 ? 'WARNING' : 'HEALTHY';
+      return { ...latest, status, latency_p95_ms: percentile(rows.map((x) => numberValue(x.latency_ms)), 95), error_rate: errorRate, rps: numberValue(latest.rps) };
     });
     const unresolvedEvents = (eventsResult.data ?? []) as EventRow[];
     const violations = (violationResult.data ?? []) as EventRow[];
@@ -254,7 +255,7 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
         traceId: event.trace_id,
         actionLabel: 'Read more',
       } satisfies RootCauseEvent)),
-      apiTrend: buildApiTrend((metricsResult.data ?? []) as MetricRow[]),
+      apiTrend: buildApiTrend([...(metricsResult.data ?? [])].reverse() as MetricRow[]),
       violationHeatmap: buildViolationHeatmap(violations),
     });
     setLastUpdatedAt(new Date());
