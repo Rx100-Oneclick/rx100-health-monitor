@@ -1,13 +1,18 @@
 import { ShieldCheck, Download } from 'lucide-react';
+import type { PolicyBreakdownData } from '../types';
 
-export function PolicyBreakdown() {
+interface PolicyBreakdownProps {
+  data: PolicyBreakdownData;
+}
+
+export function PolicyBreakdown({ data }: PolicyBreakdownProps) {
   const metrics = [
-    { label: 'TOTAL\nPOLICIES', value: '142', color: 'text-slate-700', bg: 'bg-slate-50' },
-    { label: 'COMPLIANT', value: '134 ✓', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'NON-COMPLIANT', value: '7 ✗', color: 'text-red-600', bg: 'bg-red-50' },
-    { label: 'EXEMPTED', value: '1', color: 'text-gray-600', bg: 'bg-gray-50' },
-    { label: 'LAST AUDIT', value: '2h ago', color: 'text-slate-700', bg: 'bg-slate-50' },
-    { label: 'DRIFT EVENTS', value: '+3 today', color: 'text-amber-600', bg: 'bg-amber-50' }
+    { label: 'TOTAL\nPOLICIES', value: data.totalPolicies.toLocaleString(), color: 'text-slate-700', bg: 'bg-slate-50' },
+    { label: 'COMPLIANT', value: `${data.compliant.toLocaleString()} ✓`, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'NON-COMPLIANT', value: `${data.nonCompliant.toLocaleString()} ✗`, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'EXEMPTED', value: data.exempted.toLocaleString(), color: 'text-gray-600', bg: 'bg-gray-50' },
+    { label: 'LAST AUDIT', value: data.lastAudit, color: 'text-slate-700', bg: 'bg-slate-50' },
+    { label: 'DRIFT EVENTS', value: `+${data.driftEventsToday} today`, color: 'text-amber-600', bg: 'bg-amber-50' }
   ];
 
   return (
@@ -18,23 +23,14 @@ export function PolicyBreakdown() {
           <h2 className="text-base sm:text-lg md:text-xl font-semibold text-[#0F172A]">Policy Compliance Breakdown</h2>
         </div>
         <button className="flex items-center gap-2 text-xs sm:text-sm text-[#7C3AED] hover:text-[#6D28D9] transition-colors self-start sm:self-auto">
-          <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-          Download Report
+          <Download className="w-3 h-3 sm:w-4 sm:h-4" />Download Report
         </button>
       </div>
-
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {metrics.map((metric, idx) => (
-          <div
-            key={idx}
-            className={`${metric.bg} rounded-lg sm:rounded-xl p-3 sm:p-4 hover:shadow-sm transition-all cursor-pointer`}
-          >
-            <div className="text-[10px] sm:text-[11px] uppercase tracking-wide text-gray-500 mb-1.5 sm:mb-2 whitespace-pre-line">
-              {metric.label}
-            </div>
-            <div className={`text-xl sm:text-2xl font-bold ${metric.color} tabular-nums`}>
-              {metric.value}
-            </div>
+          <div key={idx} className={`${metric.bg} rounded-lg sm:rounded-xl p-3 sm:p-4 hover:shadow-sm transition-all cursor-pointer`}>
+            <div className="text-[10px] sm:text-[11px] uppercase tracking-wide text-gray-500 mb-1.5 sm:mb-2 whitespace-pre-line">{metric.label}</div>
+            <div className={`text-xl sm:text-2xl font-bold ${metric.color} tabular-nums`}>{metric.value}</div>
           </div>
         ))}
       </div>

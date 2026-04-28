@@ -34,7 +34,7 @@ export function useIframeAuth(): AuthState {
     const applySession = async (accessToken?: string | null, refreshToken?: string | null) => {
       if (!isSupabaseConfigured || !supabase) {
         if (!cancelled) {
-          setError('Supabase environment variables are missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+          setError('Supabase environment variables are missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
           setIsReady(true);
         }
         return;
