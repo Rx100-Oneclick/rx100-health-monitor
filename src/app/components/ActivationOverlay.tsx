@@ -87,6 +87,11 @@ export function ActivationOverlay({ open, onOpenChange, tenantId, userId, email,
     }, '*');
   };
 
+  const handleBackToMonitoring = () => {
+    window.parent?.postMessage({ type: 'NAVIGATE_BACK' }, '*');
+    onOpenChange(false);
+  };
+
   useEffect(() => {
     if (!open) return;
 
@@ -138,7 +143,7 @@ export function ActivationOverlay({ open, onOpenChange, tenantId, userId, email,
               <div className="max-w-md rounded-2xl border border-destructive/20 bg-card p-6 text-center shadow-lg">
                 <h2 className="text-lg font-semibold text-destructive">Unable to open application</h2>
                 <p className="mt-2 text-sm text-muted-foreground">{error}</p>
-                <button onClick={() => onOpenChange(false)} className="mt-5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:from-indigo-600 hover:to-violet-700">
+                <button onClick={handleBackToMonitoring} className="mt-5 rounded-lg bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:from-indigo-600 hover:to-violet-700">
                   Back to monitoring
                 </button>
               </div>
