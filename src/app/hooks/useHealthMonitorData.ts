@@ -117,12 +117,21 @@ const mapWorkflow = (row: MetricRow): WorkflowRow => ({
   lastCheck: formatRelative(row.captured_at),
 });
 
+const deriveApiStatus = (row: MetricRow): HealthStatus => {
+  const statusCode = numberValue(row.status_code);
+  const errorRate = numberValue(row.error_rate);
+  if (String(row.status ?? '').length) return normalizeStatus(row.status);
+  if (statusCode >= 500 || errorRate >= 5 || row.is_success === false) return 'critical';
+  if (statusCode >= 400 || errorRate >= 1) return 'warning';
+  return 'healthy';
+};
+
 const mapApiEndpoint = (row: MetricRow): ApiEndpointRow => ({
-  status: normalizeStatus(row.status),
+  status: deriveApiStatus(row),
   tenantId: row.tenant_id,
   endpoint: row.endpoint ?? '—',
   method: row.method ?? 'GET',
-  latencyP95: numberValue(row.latency_p95_ms),
+  latencyP95: numberValue(row.latency_p95_ms ?? row.latency_ms),
   errorRate: numberValue(row.error_rate),
   rps: numberValue(row.rps),
   lastCheck: formatRelative(row.captured_at),
@@ -174,15 +183,18 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
 
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const [policiesResult, workflowsResult, metricsResult, eventsResult, violationResult] = await Promise.all([
+    const [policiesResult, recentPoliciesResult, workflowsResult, recentWorkflowsResult, metricsResult, recentMetricsResult, eventsResult, violationResult] = await Promise.all([
       supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }),
+      supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }).limit(5),
       supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).gte('captured_at', oneDayAgo).order('captured_at', { ascending: false }),
+      supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
       supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(1000),
+      supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
       supabase.from('health_monitor_events').select('*').eq('tenant_id', tenantId).eq('is_resolved', false).order('detected_at', { ascending: false }).limit(5),
       supabase.from('health_monitor_events').select('detected_at, severity').eq('tenant_id', tenantId).eq('entity_type', 'POLICY').eq('event_type', 'POLICY_VIOLATION').gte('detected_at', oneDayAgo),
     ]);
 
-    const firstError = policiesResult.error ?? workflowsResult.error ?? metricsResult.error ?? eventsResult.error ?? violationResult.error;
+    const firstError = policiesResult.error ?? recentPoliciesResult.error ?? workflowsResult.error ?? recentWorkflowsResult.error ?? metricsResult.error ?? recentMetricsResult.error ?? eventsResult.error ?? violationResult.error;
     if (firstError) {
       setError(firstError.message);
       setLoading(false);
@@ -190,8 +202,11 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     }
 
     const policyMetrics = (policiesResult.data ?? []) as MetricRow[];
+    const recentPolicyMetrics = (recentPoliciesResult.data ?? []) as MetricRow[];
     const workflowMetrics = (workflowsResult.data ?? []) as MetricRow[];
+    const recentWorkflowMetrics = (recentWorkflowsResult.data ?? []) as MetricRow[];
     const apiMetrics = (metricsResult.data ?? []) as MetricRow[];
+    const recentApiMetrics = (recentMetricsResult.data ?? []) as MetricRow[];
     const policies = latestBy(policyMetrics, (x) => x.policy_id ?? x.policy_name, 'evaluated_at');
     const workflowGroups = new Map<string, MetricRow[]>();
     workflowMetrics.forEach((row) => {
