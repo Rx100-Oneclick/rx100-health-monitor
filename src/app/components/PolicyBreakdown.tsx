@@ -1,4 +1,4 @@
-import { ShieldCheck, Download } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import type { PolicyBreakdownData } from '../types';
 
 interface PolicyBreakdownProps {
@@ -22,9 +22,6 @@ export function PolicyBreakdown({ data }: PolicyBreakdownProps) {
           <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
           <h2 className="text-base sm:text-lg md:text-xl font-semibold text-[#0F172A]">Policy Compliance Breakdown</h2>
         </div>
-        <button className="flex items-center gap-2 text-xs sm:text-sm text-[#7C3AED] hover:text-[#6D28D9] transition-colors self-start sm:self-auto">
-          <Download className="w-3 h-3 sm:w-4 sm:h-4" />Download Report
-        </button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         {metrics.map((metric, idx) => (

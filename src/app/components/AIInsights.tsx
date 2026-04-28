@@ -1,4 +1,5 @@
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import type { RootCauseEvent } from '../types';
 
 interface AIInsightsProps {
@@ -13,6 +14,9 @@ const severityConfig = (severity: string) => {
 };
 
 export function AIInsights({ insights }: AIInsightsProps) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleInsights = expanded ? insights : insights.slice(0, 2);
+
   return (
     <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
@@ -24,7 +28,7 @@ export function AIInsights({ insights }: AIInsightsProps) {
       </div>
       <div className="flex flex-col gap-2 sm:gap-3">
         {insights.length === 0 && <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No unresolved root cause events for this tenant.</div>}
-        {insights.map((insight, idx) => {
+        {visibleInsights.map((insight, idx) => {
           const config = severityConfig(insight.severity);
           return (
             <div key={`${insight.title}-${idx}`} className={`border-l-4 ${config.borderColor} bg-gray-50 rounded-r-lg p-3 sm:p-4 hover:bg-gray-100 transition-colors`}>
@@ -32,15 +36,17 @@ export function AIInsights({ insights }: AIInsightsProps) {
                 <span className="text-base sm:text-lg">{config.icon}</span>
                 <div className="flex-1">
                   <h3 className="font-semibold text-[#0F172A] text-xs sm:text-sm mb-1">{insight.title}</h3>
-                  <p className="text-xs sm:text-sm text-gray-600 mb-1.5 sm:mb-2">{insight.description}</p>
-                  <button className="flex items-center gap-1 text-xs sm:text-sm text-[#7C3AED] hover:text-[#6D28D9] transition-colors">
-                    {insight.actionLabel}<ArrowRight className="w-3 h-3" />
-                  </button>
+                  <p className="text-xs sm:text-sm text-gray-600">{insight.description}</p>
                 </div>
               </div>
             </div>
           );
         })}
+        {insights.length > 2 && (
+          <button onClick={() => setExpanded((value) => !value)} className="self-start text-xs sm:text-sm font-medium text-[#7C3AED] hover:text-[#6D28D9] transition-colors">
+            {expanded ? 'Show less' : `Read more (${insights.length - 2})`}
+          </button>
+        )}
       </div>
     </div>
   );
