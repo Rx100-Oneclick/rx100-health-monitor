@@ -11,8 +11,9 @@ import type {
   WorkflowRow,
 } from '../types';
 
-type EventRow = Record<string, any>;
-type MetricRow = Record<string, any>;
+type JsonObject = Record<string, unknown>;
+type EventRow = Record<string, unknown> & { metadata?: JsonObject | null };
+type MetricRow = Record<string, unknown> & { metadata?: JsonObject | null };
 
 const emptyDashboard: DashboardData = {
   summary: {
@@ -87,12 +88,12 @@ const bucketTime = (value: string, minutes = 5) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
-const latestBy = <T extends Record<string, any>>(rows: T[], keyGetter: (row: T) => string, dateField: string) => {
+const latestBy = <T extends Record<string, unknown>>(rows: T[], keyGetter: (row: T) => string, dateField: string) => {
   const latest = new Map<string, T>();
   rows.forEach((row) => {
     const key = keyGetter(row);
     const current = latest.get(key);
-    if (!current || new Date(row[dateField]).getTime() > new Date(current[dateField]).getTime()) latest.set(key, row);
+    if (!current || new Date(String(row[dateField])).getTime() > new Date(String(current[dateField])).getTime()) latest.set(key, row);
   });
   return Array.from(latest.values());
 };
