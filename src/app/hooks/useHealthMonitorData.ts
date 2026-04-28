@@ -111,8 +111,8 @@ const mapWorkflow = (row: MetricRow): WorkflowRow => ({
   tenantId: row.tenant_id,
   workflowName: row.workflow_name ?? row.workflow_id ?? 'Unnamed workflow',
   version: row.workflow_version ?? '—',
-  runs24h: numberValue(row.total_runs_24h),
-  successRate: numberValue(row.success_rate),
+  runs24h: numberValue(row.total_runs_24h, 1),
+  successRate: row.success_rate == null ? (['SUCCESS', 'COMPLETED', 'HEALTHY'].includes(String(row.status ?? '').toUpperCase()) ? 100 : 0) : numberValue(row.success_rate),
   avgDuration: formatDuration(row.avg_duration_ms),
   lastCheck: formatRelative(row.captured_at),
 });
@@ -260,9 +260,9 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
         lastAudit: formatRelative(latestAudit),
         driftEventsToday: unresolvedEvents.filter((x) => x.event_type === 'POLICY_DRIFT' && String(x.detected_at ?? '').startsWith(today)).length,
       },
-      policies: policies.map(mapPolicy),
-      workflows: workflows.map(mapWorkflow),
-      apiEndpoints: apis.map(mapApiEndpoint),
+      policies: recentPolicyMetrics.map(mapPolicy),
+      workflows: recentWorkflowMetrics.map(mapWorkflow),
+      apiEndpoints: recentApiMetrics.map(mapApiEndpoint),
       rootCauseEvents: unresolvedEvents.map((event) => ({
         severity: event.severity ?? 'info',
         title: event.title ?? 'Health event detected',
