@@ -199,8 +199,8 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
       const key = row.workflow_id ?? row.workflow_name;
       workflowGroups.set(key, [...(workflowGroups.get(key) ?? []), row]);
     });
-    const workflows = Array.from(workflowGroups.values()).map((rows) => {
-      const latest = latestBy(rows, () => 'workflow', 'captured_at')[0];
+    const workflows: MetricRow[] = Array.from(workflowGroups.values()).map((rows) => {
+      const latest = latestBy(rows, () => 'workflow', 'captured_at')[0] ?? rows[0];
       const successful = rows.filter((x) => ['SUCCESS', 'COMPLETED', 'HEALTHY'].includes(String(x.status ?? '').toUpperCase())).length;
       return { ...latest, total_runs_24h: rows.length, success_rate: rows.length ? (successful / rows.length) * 100 : 0, avg_duration_ms: rows.reduce((a, x) => a + numberValue(x.duration_ms), 0) / Math.max(1, rows.length) };
     });
@@ -209,8 +209,8 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
       const key = `${row.method ?? 'GET'} ${row.endpoint}`;
       apiGroups.set(key, [...(apiGroups.get(key) ?? []), row]);
     });
-    const apis = Array.from(apiGroups.values()).map((rows) => {
-      const latest = latestBy(rows, () => 'api', 'captured_at')[0];
+    const apis: MetricRow[] = Array.from(apiGroups.values()).map((rows) => {
+      const latest = latestBy(rows, () => 'api', 'captured_at')[0] ?? rows[0];
       const failures = rows.filter((x) => x.is_success === false).length;
       const errorRate = rows.length ? (failures / rows.length) * 100 : numberValue(latest.error_rate);
       return { ...latest, status: errorRate >= 5 ? 'CRITICAL' : errorRate >= 1 ? 'WARNING' : 'HEALTHY', latency_p95_ms: percentile(rows.map((x) => numberValue(x.latency_ms)), 95), error_rate: errorRate, rps: numberValue(latest.rps) };
