@@ -88,7 +88,7 @@ export function ActivationOverlay({ open, onOpenChange, tenantId, userId, email,
   };
 
   const handleBackToMonitoring = () => {
-    window.parent?.postMessage({ type: 'NAVIGATE_BACK' }, '*');
+    iframeRef.current?.contentWindow?.postMessage({ type: 'NAVIGATE_BACK' }, '*');
     onOpenChange(false);
   };
 
