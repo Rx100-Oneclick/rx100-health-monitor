@@ -269,7 +269,8 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     if (!tenantId || !enabled || !supabase) return;
     const channel = supabase
       .channel(`health-monitor-live-${tenantId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'health_monitor_snapshots', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'policy_health_metrics', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_health_metrics', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'health_monitor_events', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'api_health_metrics', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
       .subscribe();
