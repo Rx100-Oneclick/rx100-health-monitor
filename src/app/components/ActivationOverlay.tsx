@@ -16,13 +16,8 @@ interface ActivationOverlayProps {
   onApplied: () => void;
 }
 
-type LifecycleMessage = {
+type IframeMessage = {
   type?: string;
-  payload?: {
-    ledger_id?: string;
-    new_status?: string;
-    lifecycle_id?: string;
-  };
 };
 
 export function ActivationOverlay({ open, onOpenChange, tenantId, userId, email, accessToken, refreshToken, onApplied }: ActivationOverlayProps) {
@@ -89,28 +84,20 @@ export function ActivationOverlay({ open, onOpenChange, tenantId, userId, email,
 
   const handleBackToMonitoring = () => {
     iframeRef.current?.contentWindow?.postMessage({ type: 'NAVIGATE_BACK' }, '*');
-    onOpenChange(false);
   };
 
   useEffect(() => {
     if (!open) return;
 
-    const onMessage = (event: MessageEvent<LifecycleMessage>) => {
-      if (event.data?.type === 'LIFECYCLE_CANCEL') {
-        window.parent?.postMessage({ type: 'LIFECYCLE_CANCEL' }, '*');
+    const onMessage = (event: MessageEvent<IframeMessage>) => {
+      if (event.data?.type === 'NAVIGATE_BACK') {
         onOpenChange(false);
-      }
-
-      if (event.data?.type === 'LIFECYCLE_APPLIED') {
-        window.parent?.postMessage({ type: 'LIFECYCLE_APPLIED', payload: event.data.payload }, '*');
-        onOpenChange(false);
-        onApplied();
       }
     };
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [onApplied, onOpenChange, open]);
+  }, [onOpenChange, open]);
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
