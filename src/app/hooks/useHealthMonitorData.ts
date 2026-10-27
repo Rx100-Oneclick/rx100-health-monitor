@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ApiEndpointRow,
   ApiTrendPoint,
@@ -176,28 +176,28 @@ const buildViolationHeatmap = (rows: EventRow[]): ViolationHeatmapPoint[] => {
   return Array.from(buckets.values());
 };
 
-export function useHealthMonitorData(tenantId: string | null, enabled: boolean) {
+export function useHealthMonitorData(client: SupabaseClient | null, tenantId: string | null, enabled: boolean) {
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!tenantId || !enabled || !supabase) return;
+    if (!client || !tenantId || !enabled) return;
     setLoading(true);
     setError(null);
 
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const [policiesResult, recentPoliciesResult, workflowsResult, recentWorkflowsResult, metricsResult, recentMetricsResult, eventsResult, violationResult] = await Promise.all([
-      supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }),
-      supabase.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }).limit(5),
-      supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).gte('captured_at', oneDayAgo).order('captured_at', { ascending: false }),
-      supabase.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
-      supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(1000),
-      supabase.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
-      supabase.from('health_monitor_events').select('*').eq('tenant_id', tenantId).eq('is_resolved', false).order('detected_at', { ascending: false }).limit(5),
-      supabase.from('health_monitor_events').select('detected_at, severity').eq('tenant_id', tenantId).eq('entity_type', 'POLICY').eq('event_type', 'POLICY_VIOLATION').gte('detected_at', oneDayAgo),
+      client.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }),
+      client.from('policy_health_metrics').select('*').eq('tenant_id', tenantId).order('evaluated_at', { ascending: false }).limit(5),
+      client.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).gte('captured_at', oneDayAgo).order('captured_at', { ascending: false }),
+      client.from('workflow_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
+      client.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(1000),
+      client.from('api_health_metrics').select('*').eq('tenant_id', tenantId).order('captured_at', { ascending: false }).limit(5),
+      client.from('health_monitor_events').select('*').eq('tenant_id', tenantId).eq('is_resolved', false).order('detected_at', { ascending: false }).limit(5),
+      client.from('health_monitor_events').select('detected_at, severity').eq('tenant_id', tenantId).eq('entity_type', 'POLICY').eq('event_type', 'POLICY_VIOLATION').gte('detected_at', oneDayAgo),
     ]);
 
     const firstError = policiesResult.error ?? recentPoliciesResult.error ?? workflowsResult.error ?? recentWorkflowsResult.error ?? metricsResult.error ?? recentMetricsResult.error ?? eventsResult.error ?? violationResult.error;
@@ -281,15 +281,15 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
     });
     setLastUpdatedAt(new Date());
     setLoading(false);
-  }, [enabled, tenantId]);
+  }, [client, enabled, tenantId]);
 
   useEffect(() => {
     void fetchDashboardData();
   }, [fetchDashboardData]);
 
   useEffect(() => {
-    if (!tenantId || !enabled || !supabase) return;
-    const channel = supabase
+    if (!client || !tenantId || !enabled) return;
+    const channel = client
       .channel(`health-monitor-live-${tenantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'policy_health_metrics', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_health_metrics', filter: `tenant_id=eq.${tenantId}` }, () => void fetchDashboardData())
@@ -298,9 +298,9 @@ export function useHealthMonitorData(tenantId: string | null, enabled: boolean) 
       .subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      void client.removeChannel(channel);
     };
-  }, [enabled, fetchDashboardData, tenantId]);
+  }, [client, enabled, fetchDashboardData, tenantId]);
 
   return useMemo(() => ({ data, loading, error, lastUpdatedAt, refetch: fetchDashboardData }), [data, error, fetchDashboardData, lastUpdatedAt, loading]);
 }
