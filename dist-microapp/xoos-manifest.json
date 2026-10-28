@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "microappKey": "workflow-health-monitor",
+  "version": "1.0.0",
+  "elementName": "xoos-workflow-health-monitor",
+  "entry": "xoos-microapp.js",
+  "deliveryType": "native_esm",
+  "contractVersion": "1",
+  "minimumRuntimeVersion": "1.0.0",
+  "integrity": {
+    "algorithm": "sha256",
+    "value": "ffd1e39b036fd7f0b4212f403682e7d14a96d7b3db05794fd578f30c1219144a"
+  }
+}
