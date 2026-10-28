@@ -5,13 +5,18 @@ import { AIInsights } from './components/AIInsights';
 import { APIHealthChart } from './components/APIHealthChart';
 import { ViolationHeatmap } from './components/ViolationHeatmap';
 import { TenantMonitoring } from './components/TenantMonitoring';
-import { useIframeAuth } from './hooks/useIframeAuth';
 import { useHealthMonitorData } from './hooks/useHealthMonitorData';
+import { openChildMicroapp, useWorkflowHealthMonitorClient, useXoRuntime } from '@/microapp/runtime';
+import { microappConfig } from '../../microapp.config';
+
+const REVIEW_MICROAPP_KEY = 'workflow-orchestra-review';
 
 export default function App() {
-  const auth = useIframeAuth();
-  const { data, loading, error, lastUpdatedAt, refetch } = useHealthMonitorData(auth.tenantId, auth.isReady && !auth.error);
+  const { bridge, tenantId } = useXoRuntime();
+  const { client, error: clientError, isReady: clientReady } = useWorkflowHealthMonitorClient();
+  const { data, loading, error, lastUpdatedAt } = useHealthMonitorData(client, tenantId, clientReady && !clientError);
   const [now, setNow] = useState(Date.now());
+  const [navigationError, setNavigationError] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -23,25 +28,33 @@ export default function App() {
     return Math.max(0, Math.floor((now - lastUpdatedAt.getTime()) / 1000));
   }, [lastUpdatedAt, now]);
 
-  if (!auth.isReady) {
+  const handleViewMore = () => {
+    setNavigationError(null);
+    void openChildMicroapp(bridge, REVIEW_MICROAPP_KEY, {
+      parentMicroappKey: microappConfig.microappKey,
+    }).catch(() => {
+      setNavigationError('Unable to open Workflow Orchestra Review.');
+    });
+  };
+
+  if (clientError) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl p-8 shadow-sm max-w-md text-center">
-          <div className="mx-auto mb-4 h-10 w-10 rounded-full border-4 border-purple-100 border-t-[#7C3AED] animate-spin" />
-          <h1 className="text-xl font-bold text-[#0F172A]">Waiting for authentication</h1>
-          <p className="mt-2 text-sm text-gray-500">The dashboard is waiting for the parent application to provide session tokens and tenant_id.</p>
+        <div className="bg-white rounded-2xl p-8 shadow-sm max-w-lg">
+          <h1 className="text-xl font-bold text-red-600">Datasource unavailable</h1>
+          <p className="mt-2 text-sm text-gray-600">Unable to connect to the authorized XOOS datasource.</p>
         </div>
       </div>
     );
   }
 
-  if (auth.error) {
+  if (!clientReady) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl p-8 shadow-sm max-w-lg">
-          <h1 className="text-xl font-bold text-red-600">Authentication setup required</h1>
-          <p className="mt-2 text-sm text-gray-600">{auth.error}</p>
-          <p className="mt-4 text-xs text-gray-500">Expected URL params: access_token, refresh_token, user_id, email, tenant_id. Backup auth is supported through AUTH_SESSION postMessage.</p>
+        <div className="bg-white rounded-2xl p-8 shadow-sm max-w-md text-center">
+          <div className="mx-auto mb-4 h-10 w-10 rounded-full border-4 border-purple-100 border-t-[#7C3AED] animate-spin" />
+          <h1 className="text-xl font-bold text-[#0F172A]">Connecting to XOOS</h1>
+          <p className="mt-2 text-sm text-gray-500">Loading the authorized health-monitor datasource.</p>
         </div>
       </div>
     );
@@ -54,7 +67,9 @@ export default function App() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#0F172A]">Health Monitor</h1>
-              <p className="text-xs sm:text-[13px] text-gray-500 mt-0.5">Real-time policy, workflow & API observability{auth.tenantId ? ` • ${auth.tenantId}` : ''}</p>
+              <p className="text-xs sm:text-[13px] text-gray-500 mt-0.5">
+                Real-time policy, workflow & API observability{tenantId ? ` • ${tenantId}` : ''}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full">
@@ -65,9 +80,9 @@ export default function App() {
             </div>
           </div>
 
-          {(loading || error) && (
-            <div className={`${error ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-blue-700 border-blue-100'} border rounded-xl px-4 py-3 text-sm`}>
-              {error ? `Unable to load tenant data: ${error}` : 'Loading tenant health data...'}
+          {(loading || error || navigationError) && (
+            <div className={`${error || navigationError ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-blue-700 border-blue-100'} border rounded-xl px-4 py-3 text-sm`}>
+              {navigationError ? navigationError : error ? `Unable to load tenant data: ${error}` : 'Loading tenant health data...'}
             </div>
           )}
 
@@ -87,12 +102,7 @@ export default function App() {
             policies={data.policies}
             workflows={data.workflows}
             endpoints={data.apiEndpoints}
-            tenantId={auth.tenantId}
-            userId={auth.userId}
-            email={auth.email}
-            accessToken={auth.accessToken}
-            refreshToken={auth.refreshToken}
-            onRefresh={refetch}
+            onViewMore={handleViewMore}
           />
         </div>
       </div>

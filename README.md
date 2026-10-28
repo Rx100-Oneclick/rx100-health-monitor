@@ -1,73 +1,94 @@
-# Welcome to your Lovable project
+# Workflow Health Monitor
 
-## Project info
+XOOS Native ESM hub/dashboard Microapp for real-time policy, workflow, and API health monitoring.
 
-**URL**: https://lovable.dev/projects/fa6f5b3f-f98d-4e07-ab3d-161b1d51bf11
+## XOOS Microapp identity
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/fa6f5b3f-f98d-4e07-ab3d-161b1d51bf11) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```text
+schemaVersion: 1
+microappKey: workflow-health-monitor
+version: 1.0.0
+elementName: xoos-workflow-health-monitor
+deliveryType: native_esm
+contractVersion: 1
+minimumRuntimeVersion: 1.0.0
+dataProjectKey: xoos-core
 ```
 
-**Edit a file directly in GitHub**
+The production entry is mounted by `@xoos/microapp-adapter@0.3.0` using `defineXOOSMicroapp()` with Shadow DOM enabled.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Hub navigation
 
-**Use GitHub Codespaces**
+The existing **View More** control is a child Microapp launch.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```text
+workflow-health-monitor
+  View More
+    → workflow-orchestra-review
+```
 
-## What technologies are used for this project?
+Runtime navigation passes:
 
-This project is built with:
+```ts
+{
+  parentMicroappKey: "workflow-health-monitor"
+}
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The child Microapp is responsible for enforcing its own effective permissions for any protected actions.
 
-## How can I deploy this project?
+## Runtime datasource
 
-Simply open [Lovable](https://lovable.dev/projects/fa6f5b3f-f98d-4e07-ab3d-161b1d51bf11) and click on Share -> Publish.
+The approved datasource is `xoos-core`, acquired through `@xoos/data-client` and the Runtime data bridge.
 
-## Can I connect a custom domain to my Lovable project?
+Existing business reads are preserved:
 
-Yes, you can!
+- `policy_health_metrics`
+- `workflow_health_metrics`
+- `api_health_metrics`
+- `health_monitor_events`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+The existing tenant filters, time windows, ordering, limits, KPI calculations, grouping, trend/heatmap transforms, and realtime subscriptions remain unchanged.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Security migration
+
+The following legacy host behavior was removed:
+
+- URL-based access/refresh token transport
+- browser-provided tenant/user identity as the runtime authority
+- `AUTH_SESSION` / `IFRAME_READY` postMessage authentication
+- Microapp-owned `supabase.auth.setSession()`
+- persisted browser Supabase sessions
+- iframe loading of the Review application
+- `app_registry.target_url` lookup used to discover a child deployment URL
+- wildcard child postMessage navigation
+- direct browser Supabase client configuration
+- committed local environment configuration
+
+Runtime identity now comes from the XOOS bridge and the child is opened by its registered Microapp key.
+
+## Permission boundary
+
+**View More** is classified as `CHILD_MICROAPP_NAVIGATION`, not a local CREATE or UPDATE operation. No Services action string is guessed in this repository. If Services later defines the parent launch itself as restricted, wire that exact dynamic action through the Runtime permission API.
+
+## Build
+
+```sh
+npm install
+npm run build
+npm run build:microapp
+```
+
+Microapp output:
+
+```text
+dist-microapp/
+  xoos-microapp.js
+  xoos-manifest.json
+```
+
+The post-build step computes SHA-256 over the final `xoos-microapp.js` bytes and writes the lowercase hex digest to the manifest.
+
+## Release boundary
+
+This migration configures the Microapp only. It does not upload artifacts, publish a release, update Storage, or modify control-plane deployment records.
