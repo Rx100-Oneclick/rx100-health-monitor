@@ -1,7 +1,7 @@
 export const microappConfig = {
   schemaVersion: "1",
   microappKey: "workflow-health-monitor",
-  version: "1.0.0",
+  version: "1.0.1",
   elementName: "xoos-workflow-health-monitor",
   deliveryType: "native_esm",
   contractVersion: "1",
